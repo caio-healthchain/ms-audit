@@ -1,0 +1,393 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Identificação da entidade auditada
+  entityType EntityType
+  entityId   String
+  entityName String?
+
+  // Ação realizada
+  action      AuditAction
+  description String
+  category    AuditCategory
+
+  // Usuário que realizou a ação
+  userId       String
+  userName     String
+  userRole     String
+  userEmail    String?
+
+  // Dados da alteração
+  oldData Json?
+  newData Json?
+  changes Json?
+
+  // Contexto da requisição
+  ipAddress   String
+  userAgent   String
+  sessionId   String
+  requestId   String?
+
+  // Validação e aprovação
+  validationStatus ValidationStatus @default(PENDING)
+  validatedBy      String?
+  validatedAt      DateTime?
+  justification    String?
+  rejectionReason  String?
+
+  // Metadados adicionais
+  metadata Json?
+  tags     String[]
+
+  // Relacionamentos externos (IDs apenas)
+  patientId   String?
+  procedureId String?
+  billingId   String?
+
+  // Risco e impacto
+  riskLevel RiskLevel @default(LOW)
+  impact    ImpactLevel @default(LOW)
+
+  // Status de processamento
+  processed   Boolean @default(false)
+  processedAt DateTime?
+
+  // Índices
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([validationStatus])
+  @@index([category])
+  @@index([riskLevel])
+  @@index([patientId])
+  @@index([procedureId])
+  @@index([billingId])
+  @@map("audit_logs")
+}
+
+model ValidationPendency {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Identificação
+  title       String
+  description String
+  category    PendencyCategory
+  priority    PendencyPriority @default(MEDIUM)
+
+  // Entidade relacionada
+  entityType EntityType
+  entityId   String
+  entityName String?
+
+  // Status
+  status      PendencyStatus @default(OPEN)
+  assignedTo  String?
+  assignedAt  DateTime?
+
+  // Resolução
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  resolution  String?
+
+  // Datas limite
+  dueDate     DateTime?
+  escalatedAt DateTime?
+
+  // Metadados
+  metadata    Json?
+  attachments String[]
+
+  // Relacionamentos externos
+  patientId   String?
+  procedureId String?
+  billingId   String?
+  auditLogId  String?
+
+  // Índices
+  @@index([status])
+  @@index([category])
+  @@index([priority])
+  @@index([assignedTo])
+  @@index([dueDate])
+  @@index([entityType, entityId])
+  @@index([patientId])
+  @@index([procedureId])
+  @@index([billingId])
+  @@map("validation_pendencies")
+}
+
+model AuditRule {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Identificação
+  name        String   @unique
+  description String
+  category    AuditRuleCategory
+
+  // Condições
+  entityType  EntityType
+  conditions  Json // Condições para aplicar a regra
+  triggers    Json // Eventos que disparam a regra
+
+  // Ações
+  actions     Json // Ações a serem executadas
+  severity    RiskLevel @default(LOW)
+
+  // Configurações
+  isActive    Boolean @default(true)
+  priority    Int     @default(0)
+
+  // Metadados
+  metadata    Json?
+
+  // Índices
+  @@index([entityType])
+  @@index([category])
+  @@index([isActive])
+  @@index([priority])
+  @@map("audit_rules")
+}
+
+model ComplianceCheck {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Identificação
+  name        String
+  description String
+  category    ComplianceCategory
+
+  // Entidade verificada
+  entityType  EntityType
+  entityId    String
+  entityName  String?
+
+  // Resultado
+  status      ComplianceStatus
+  score       Decimal? @db.Decimal(5, 2)
+  maxScore    Decimal? @db.Decimal(5, 2)
+
+  // Detalhes
+  findings    Json // Achados da verificação
+  recommendations Json? // Recomendações
+
+  // Execução
+  executedBy  String
+  executedAt  DateTime @default(now())
+  duration    Int? // em segundos
+
+  // Relacionamentos externos
+  patientId   String?
+  procedureId String?
+  billingId   String?
+
+  // Índices
+  @@index([category])
+  @@index([status])
+  @@index([entityType, entityId])
+  @@index([executedAt])
+  @@index([patientId])
+  @@index([procedureId])
+  @@index([billingId])
+  @@map("compliance_checks")
+}
+
+model AuditReport {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Identificação
+  title       String
+  description String?
+  type        ReportType
+  category    ReportCategory
+
+  // Período
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Filtros aplicados
+  filters     Json
+
+  // Dados do relatório
+  data        Json
+  summary     Json?
+  metrics     Json?
+
+  // Status
+  status      ReportStatus @default(GENERATING)
+  progress    Int @default(0)
+
+  // Geração
+  generatedBy String
+  generatedAt DateTime?
+  fileUrl     String?
+  fileSize    Int?
+
+  // Configurações
+  isScheduled Boolean @default(false)
+  schedule    String? // Cron expression
+
+  // Índices
+  @@index([type])
+  @@index([category])
+  @@index([status])
+  @@index([periodStart, periodEnd])
+  @@index([generatedBy])
+  @@map("audit_reports")
+}
+
+// Enums
+enum EntityType {
+  PATIENT
+  PROCEDURE
+  BILLING
+  MATERIAL
+  USER
+  SYSTEM
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  APPROVE
+  REJECT
+  VALIDATE
+  EXPORT
+  IMPORT
+  LOGIN
+  LOGOUT
+}
+
+enum AuditCategory {
+  DATA_CHANGE
+  ACCESS_CONTROL
+  VALIDATION
+  APPROVAL
+  SYSTEM_EVENT
+  SECURITY_EVENT
+  COMPLIANCE
+}
+
+enum ValidationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  UNDER_REVIEW
+  ESCALATED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ImpactLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PendencyCategory {
+  DATA_VALIDATION
+  APPROVAL_REQUIRED
+  COMPLIANCE_ISSUE
+  SECURITY_CONCERN
+  SYSTEM_ERROR
+  BUSINESS_RULE
+}
+
+enum PendencyPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum PendencyStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ESCALATED
+  CANCELLED
+}
+
+enum AuditRuleCategory {
+  VALIDATION
+  SECURITY
+  COMPLIANCE
+  BUSINESS_RULE
+  DATA_QUALITY
+  PERFORMANCE
+}
+
+enum ComplianceCategory {
+  DATA_PRIVACY
+  SECURITY
+  REGULATORY
+  BUSINESS_POLICY
+  QUALITY_ASSURANCE
+  FINANCIAL
+}
+
+enum ComplianceStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  PARTIALLY_COMPLIANT
+  UNDER_REVIEW
+  NOT_APPLICABLE
+}
+
+enum ReportType {
+  AUDIT_SUMMARY
+  COMPLIANCE_REPORT
+  SECURITY_REPORT
+  ACTIVITY_REPORT
+  EXCEPTION_REPORT
+  CUSTOM_REPORT
+}
+
+enum ReportCategory {
+  OPERATIONAL
+  COMPLIANCE
+  SECURITY
+  FINANCIAL
+  QUALITY
+  PERFORMANCE
+}
+
+enum ReportStatus {
+  GENERATING
+  COMPLETED
+  FAILED
+  CANCELLED
+  SCHEDULED
+}
+
