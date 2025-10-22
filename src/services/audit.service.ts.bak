@@ -21,35 +21,41 @@ export class AuditService {
     try {
       const created = await prisma.auditLog.create({
         data: {
-          // Campos do schema global
-          action: AuditLogAction.CREATE,
-          entity: data.procedureId ? AuditLogEntity.PROCEDURE : AuditLogEntity.PATIENT,
+          entity: AuditLogEntity.PATIENT,                        // enum do Prisma (ajustar conforme necessário)
           entityId: data.procedureId ?? data.patientId ?? 'unknown',
-          
-          // Usuário
+          entityName: data.description ?? null,
+          action: AuditLogAction.CREATE,
+          description: data.description ?? 'Audit item created',
+          // category removido (não existe no schema global)
           userId: data.requestedBy ?? 'system',
-          userName: data.requestedBy ?? 'system',
+          userName: data.requestedBy ?? 'system',                    // obrigatório no schema
           userRole: 'SYSTEM',
-          
-          // Dados da mudança
-          oldValues: undefined,
-          newValues: {
+          userEmail: null,
+          oldData: undefined,                                        // não usar null aqui
+          newData: {
             type: data.type,
             priority: data.priority,
             description: data.description,
             metadata: data.metadata ?? null,
           },
-          changes: undefined,
-          
-          // Contexto
           ipAddress: '0.0.0.0',
           userAgent: 'ms-audit',
           sessionId: 'unknown',
-          
-          // Relacionamentos removidos (foreign key constraints)
-          // patientId: data.patientId ?? null,
-          // procedureId: data.procedureId ?? null,
-          // billingAccountId: null,
+          requestId: null,
+          validationStatus: ValidationStatus.PENDING,                // enum do Prisma
+          validatedBy: null,
+          validatedAt: null,
+          justification: null,
+          rejectionReason: null,
+          metadata: (data.metadata ?? null) as any,
+          tags: [],
+          patientId: data.patientId ?? null,
+          procedureId: data.procedureId ?? null,
+          billingId: null,
+          riskLevel: 'LOW',
+          impact: 'LOW',
+          processed: false,
+          processedAt: null,
         },
       });
 
@@ -89,28 +95,23 @@ export class AuditService {
     pagination: PaginationParams = {} as any
   ): Promise<PaginatedResponse<AuditItem>> {
     try {
-      const where: any = {};
+      const where: any = {}; // Removido filtro por entityType
 
-      // Filtros
-      if ((filters as any).entity) {
-        where.entity = (filters as any).entity;
+      if ((filters as any).status) {
+        where.validationStatus = (filters as any).status;
       }
-      if ((filters as any).action) {
-        where.action = (filters as any).action;
+      if ((filters as any).type) {
+        where.AND = where.AND || [];
+        where.AND.push({ newData: { path: ['type'], equals: (filters as any).type } });
       }
-      if ((filters as any).userId) {
-        where.userId = (filters as any).userId;
-      }
-      if ((filters as any).patientId) {
-        where.patientId = (filters as any).patientId;
-      }
-      if ((filters as any).procedureId) {
-        where.procedureId = (filters as any).procedureId;
+      if ((filters as any).priority) {
+        where.AND = where.AND || [];
+        where.AND.push({ newData: { path: ['priority'], equals: (filters as any).priority } });
       }
       if ((filters as any).search) {
         where.OR = [
-          { entityId: { contains: (filters as any).search, mode: 'insensitive' } },
-          { userName: { contains: (filters as any).search, mode: 'insensitive' } },
+          { description: { contains: (filters as any).search, mode: 'insensitive' } },
+          { entityName: { contains: (filters as any).search, mode: 'insensitive' } },
         ];
       }
 
@@ -147,51 +148,6 @@ export class AuditService {
     }
   }
 
-  // UPDATE
-  async updateAudit(id: string, updates: Partial<CreateAuditRequest>): Promise<ApiResponse<AuditItem>> {
-    try {
-      const existing = await prisma.auditLog.findUnique({ where: { id } });
-      if (!existing) throw new Error('Audit item not found');
-
-      const updated = await prisma.auditLog.update({
-        where: { id },
-        data: {
-          newValues: {
-            ...(existing.newValues as any),
-            ...updates,
-          },
-        },
-      });
-
-      return {
-        success: true,
-        data: this.mapLogToAuditItem(updated),
-        message: 'Audit item updated successfully',
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error: unknown) {
-      logger.error('Failed to update audit item:', error);
-      throw error;
-    }
-  }
-
-  // DELETE
-  async deleteAudit(id: string): Promise<ApiResponse<void>> {
-    try {
-      await prisma.auditLog.delete({ where: { id } });
-
-      return {
-        success: true,
-        data: undefined,
-        message: 'Audit item deleted successfully',
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error: unknown) {
-      logger.error('Failed to delete audit item:', error);
-      throw error;
-    }
-  }
-
   // APPROVE
   async approveAudit(id: string, decision: AuditDecisionRequest): Promise<ApiResponse<AuditItem>> {
     try {
@@ -201,8 +157,12 @@ export class AuditService {
       const updated = await prisma.auditLog.update({
         where: { id },
         data: {
-          newValues: {
-            ...(existing.newValues as any),
+          validationStatus: ValidationStatus.APPROVED,
+          validatedBy: decision.reviewedBy ?? existing.validatedBy,
+          validatedAt: new Date(),
+          justification: decision.notes ?? existing.justification,
+          newData: {
+            ...(existing.newData as any),
             status: 'APPROVED',
             reviewedBy: decision.reviewedBy ?? (existing as any).reviewedBy ?? null,
             reviewedAt: new Date().toISOString(),
@@ -232,8 +192,12 @@ export class AuditService {
       const updated = await prisma.auditLog.update({
         where: { id },
         data: {
-          newValues: {
-            ...(existing.newValues as any),
+          validationStatus: ValidationStatus.REJECTED,
+          validatedBy: decision.reviewedBy ?? existing.validatedBy,
+          validatedAt: new Date(),
+          rejectionReason: decision.notes ?? existing.rejectionReason,
+          newData: {
+            ...(existing.newData as any),
             status: 'REJECTED',
             reviewedBy: decision.reviewedBy ?? (existing as any).reviewedBy ?? null,
             reviewedAt: new Date().toISOString(),
@@ -258,25 +222,19 @@ export class AuditService {
   async getPendingAudits(): Promise<ApiResponse<PendingAuditSummary>> {
     try {
       const pendingLogs = await prisma.auditLog.findMany({
-        where: {},
+        where: { validationStatus: ValidationStatus.PENDING },
         orderBy: { createdAt: 'asc' },
         take: 100,
       });
 
       const now = new Date();
 
-      // Filtrar pending baseado em newValues.status
-      const pending = pendingLogs.filter(l => {
-        const status = (l.newValues as any)?.status;
-        return !status || status === 'PENDING';
-      });
-
       const summary: PendingAuditSummary = {
-        totalPending: pending.length,
-        urgentPending: pending.filter((l) => (l.newValues as any)?.priority === AuditPriority.URGENT).length,
-        oldestPending: pending[0]?.createdAt ?? now,
-        byType: this.groupByType(pending),
-        recentActivity: pending.slice(0, 10).map((l) => this.mapLogToAuditItem(l)),
+        totalPending: pendingLogs.length,
+        urgentPending: pendingLogs.filter((l) => (l.newData as any)?.priority === AuditPriority.URGENT).length,
+        oldestPending: pendingLogs[0]?.createdAt ?? now,
+        byType: this.groupByType(pendingLogs),
+        recentActivity: pendingLogs.slice(0, 10).map((l) => this.mapLogToAuditItem(l)),
       };
 
       return {
@@ -294,7 +252,9 @@ export class AuditService {
   // STATS
   async getAuditStatistics(): Promise<ApiResponse<AuditStatistics>> {
     try {
-      const allLogs = await prisma.auditLog.findMany({});
+      const allLogs = await prisma.auditLog.findMany({
+        where: {},
+      });
 
       const stats: AuditStatistics = {
         total: allLogs.length,
@@ -322,16 +282,13 @@ export class AuditService {
 
   // ===== Helpers =====
   private getStatusFromAuditLog(log: any): AuditStatus {
-    const status = (log.newValues as any)?.status;
-    if (status === 'APPROVED') return AuditStatus.APPROVED;
-    if (status === 'REJECTED') return AuditStatus.REJECTED;
-    if (status === 'IN_REVIEW') return AuditStatus.IN_REVIEW;
-    return AuditStatus.PENDING;
+    const vs: ValidationStatus = (log.validationStatus as ValidationStatus) ?? ValidationStatus.PENDING;
+    if (vs === ValidationStatus.APPROVED) return AuditStatus.APPROVED;
+    if (vs === ValidationStatus.REJECTED) return AuditStatus.REJECTED;
+    return AuditStatus.PENDING; // não há IN_REVIEW no schema; mantenho PENDING como default
   }
 
   private mapLogToAuditItem(log: any): AuditItem {
-    const newValues = (log.newValues as any) || {};
-    
     return {
       id: log.id,
       patientId: log.patientId ?? 'unknown',
@@ -339,61 +296,50 @@ export class AuditService {
       procedureId: log.procedureId ?? undefined,
       procedureName: undefined,
       procedureCode: undefined,
-      type: newValues.type ?? AuditType.PROCEDURE_APPROVAL,
+      type: ((log.newData as any)?.type) ?? AuditType.PROCEDURE_APPROVAL,
       status: this.getStatusFromAuditLog(log),
-      priority: newValues.priority ?? AuditPriority.MEDIUM,
-      description: newValues.description ?? 'No description',
-      requestedBy: log.userName ?? 'system',
-      requestedAt: log.createdAt.toISOString(),
-      reviewedBy: newValues.reviewedBy ?? undefined,
-      reviewedAt: newValues.reviewedAt ?? undefined,
-      notes: newValues.notes ?? undefined,
-      metadata: newValues.metadata ?? undefined,
-      createdAt: log.createdAt.toISOString(),
-      updatedAt: log.createdAt.toISOString(),
+      priority: ((log.newData as any)?.priority) ?? AuditPriority.MEDIUM,
+      description: ((log.newData as any)?.description) ?? log.description ?? '',
+      requestedBy: log.userId,
+      requestedAt: log.createdAt,
+      reviewedBy: log.validatedBy ?? undefined,
+      reviewedAt: log.validatedAt ?? undefined,
+      notes: ((log.newData as any)?.notes) ?? log.justification ?? undefined,
+      metadata: ((log.newData as any)?.metadata) ?? (log.metadata as any) ?? undefined,
+      createdAt: log.createdAt,
+      updatedAt: log.createdAt,
     };
   }
 
-  private groupByType(logs: any[]): Record<string, number> {
-    const result: Record<string, number> = {};
-    for (const log of logs) {
-      const type = (log.newValues as any)?.type ?? 'UNKNOWN';
-      result[type] = (result[type] ?? 0) + 1;
-    }
+  private groupByType(logs: any[]): Record<AuditType, number> {
+    const result = {} as Record<AuditType, number>;
+    (Object.values(AuditType) as AuditType[]).forEach((t) => {
+      result[t] = logs.filter((l) => (l.newData as any)?.type === t).length;
+    });
     return result;
   }
 
-  private groupByPriority(logs: any[]): Record<string, number> {
-    const result: Record<string, number> = {};
-    for (const log of logs) {
-      const priority = (log.newValues as any)?.priority ?? 'MEDIUM';
-      result[priority] = (result[priority] ?? 0) + 1;
-    }
+  private groupByPriority(logs: any[]): Record<AuditPriority, number> {
+    const result = {} as Record<AuditPriority, number>;
+    (Object.values(AuditPriority) as AuditPriority[]).forEach((p) => {
+      result[p] = logs.filter((l) => (l.newData as any)?.priority === p).length;
+    });
     return result;
   }
 
   private calculateAverageReviewTime(logs: any[]): number {
-    const reviewed = logs.filter((l) => (l.newValues as any)?.reviewedAt);
+    const reviewed = logs.filter((l) => (l.newData as any)?.reviewedAt);
     if (reviewed.length === 0) return 0;
-
-    const totalMs = reviewed.reduce((sum, log) => {
-      const requested = new Date(log.createdAt).getTime();
-      const reviewedAt = new Date((log.newValues as any).reviewedAt).getTime();
-      return sum + (reviewedAt - requested);
+    const totalMs = reviewed.reduce((sum, l) => {
+      const created = new Date(l.createdAt).getTime();
+      const rev = new Date((l.newData as any).reviewedAt).getTime();
+      return sum + Math.max(0, rev - created);
     }, 0);
-
-    return Math.round(totalMs / reviewed.length / 1000 / 60 / 60); // horas
-  }
+    return totalMs / reviewed.length / (1000 * 60 * 60);
+    }
 
   private countOldPending(logs: any[]): number {
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
-    return logs.filter((log) => {
-      const isPending = this.getStatusFromAuditLog(log) === AuditStatus.PENDING;
-      const isOld = new Date(log.createdAt).getTime() < oneDayAgo;
-      return isPending && isOld;
-    }).length;
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return logs.filter((l) => this.getStatusFromAuditLog(l) === AuditStatus.PENDING && new Date(l.createdAt) < cutoff).length;
   }
 }
-
