@@ -101,10 +101,14 @@ export const connectDatabases = async (): Promise<void> => {
     await prisma.$connect();
     logger.info('PostgreSQL (Write DB) connected successfully');
 
-    // Connect to MongoDB/Cosmos DB
-    await connectMongoDB();
+    // Connect to MongoDB/Cosmos DB (optional)
+    if (config.features.useCosmosDB || config.features.useMongoDBAtlas) {
+      await connectMongoDB();
+    } else {
+      logger.info('MongoDB/Cosmos DB connection skipped (disabled in config)');
+    }
 
-    // Connect to Redis
+    // Connect to Redis (optional)
     //await connectRedis();
 
     logger.info('All databases connected successfully');
