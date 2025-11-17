@@ -550,3 +550,130 @@ enum RuleStatus {
   INACTIVE
   DRAFT
 }
+
+
+// Tabela de Portes Cirúrgicos
+model tbdomPorte {
+  codigo             String    @id @db.VarChar(10)
+  procedimento       String    @db.VarChar(500)
+  porte              String    @db.VarChar(10)
+  valorFinalPorte    Decimal?  @db.Decimal(10, 2)
+  custoOperacIndice  Decimal?  @db.Decimal(10, 3)
+  custoOperacRs      Decimal?  @db.Decimal(10, 2)
+  numAuxiliar        Int?      @default(0)
+  porteAnestesico    Int?      @default(0)
+  incidencia         Int?      @default(0)
+  filmesIndice       Decimal?  @db.Decimal(10, 3)
+  dataInicioVigencia DateTime? @db.Date
+  dataFimVigencia    DateTime? @db.Date
+  dataFimImplantacao DateTime? @db.Date
+
+  @@index([codigo])
+  @@index([porte])
+  @@map("tbdomPorte")
+}
+
+// Tabela de Contratos
+model contrato {
+  id          Int              @id @default(autoincrement())
+  numero      String           @unique
+  operadoraId String
+  status      String
+  dataInicio  DateTime
+  dataFim     DateTime
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  itens       contrato_itens[]
+
+  @@index([operadoraId])
+  @@index([status])
+  @@map("contrato")
+}
+
+// Tabela de Itens do Contrato
+model contrato_itens {
+  id                 Int      @id @default(autoincrement())
+  contratoId         Int
+  codigoTUSS         String
+  valorContratado    Decimal  @db.Decimal(10, 2)
+  estaNoPacote       Boolean  @default(false)
+  requerAutorizacao  Boolean  @default(false)
+  observacoes        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  contrato           contrato @relation(fields: [contratoId], references: [id])
+
+  @@index([contratoId])
+  @@index([codigoTUSS])
+  @@map("contrato_itens")
+}
+
+// Tabela de Validações de Auditoria
+model auditoria_validacoes {
+  id               String                @id @default(cuid())
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  guiaId           Int
+  procedimentoId   Int
+  tipoValidacao    TipoValidacao
+  status           StatusValidacao
+  mensagem         String?
+  valorEsperado    Decimal?              @db.Decimal(10, 2)
+  valorEncontrado  Decimal?              @db.Decimal(10, 2)
+  diferenca        Decimal?              @db.Decimal(10, 2)
+  porteEsperado    String?
+  porteEncontrado  String?
+  metadata         Json?
+  auditorId        String?
+  dataValidacao    DateTime?
+  observacoes      String?
+
+  @@unique([guiaId, procedimentoId, tipoValidacao], name: "guiaId_procedimentoId_tipoValidacao")
+  @@index([guiaId])
+  @@index([procedimentoId])
+  @@index([status])
+  @@index([tipoValidacao])
+  @@map("auditoria_validacoes")
+}
+
+// Tabela de Status de Procedimentos
+model procedimento_status {
+  id             Int      @id @default(autoincrement())
+  guiaId         Int
+  procedimentoId Int
+  status         StatusProcedimento
+  auditorId      String?
+  observacoes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([guiaId, procedimentoId])
+  @@index([guiaId])
+  @@index([status])
+  @@map("procedimento_status")
+}
+
+// Enums para Validações
+enum TipoValidacao {
+  VALOR
+  PORTE
+  PACOTE
+  DUT
+  MATERIAL
+  DUPLICADO
+}
+
+enum StatusValidacao {
+  PENDENTE
+  CONFORME
+  DIVERGENTE
+  NAO_ENCONTRADO
+  ERRO
+}
+
+enum StatusProcedimento {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  EM_ANALISE
+}

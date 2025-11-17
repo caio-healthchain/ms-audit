@@ -17,6 +17,7 @@ import { requestLogger } from './middleware/request-logger';
 import baseRoutes from './routes/base.routes';
 import auditRoutes from './routes/audit.routes';
 import healthRoutes from './routes/health.routes';
+import procedureRoutes from './routes/procedure.routes';
 
 class msauditService {
   private app: express.Application;
@@ -81,6 +82,7 @@ class msauditService {
     // API routes
     this.app.use('/api/v1', baseRoutes);
     this.app.use('/api/v1/audits', auditRoutes);
+    this.app.use('/api/v1/procedures', procedureRoutes);
 
     // Root endpoint
     this.app.get('/', (req, res) => {
