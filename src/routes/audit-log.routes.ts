@@ -92,16 +92,16 @@ router.get(
  *     parameters:
  *       - in: query
  *         name: dataInicio
+ *         description: Data de início do período (formato: YYYY-MM-DD)
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de início do período (formato: YYYY-MM-DD)
  *       - in: query
  *         name: dataFim
+ *         description: Data de fim do período (formato: YYYY-MM-DD)
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de fim do período (formato: YYYY-MM-DD)
  *       - in: query
  *         name: operadoraId
  *         schema:
@@ -141,16 +141,16 @@ router.get(
  *     parameters:
  *       - in: query
  *         name: dataInicio
+ *         description: Data de início do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de início do período
  *       - in: query
  *         name: dataFim
+ *         description: Data de fim do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de fim do período
  *     responses:
  *       200:
  *         description: Economia por operadora
@@ -187,16 +187,16 @@ router.get(
  *     parameters:
  *       - in: query
  *         name: dataInicio
+ *         description: Data de início do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de início do período
  *       - in: query
  *         name: dataFim
+ *         description: Data de fim do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de fim do período
  *     responses:
  *       200:
  *         description: Economia por auditor
@@ -233,16 +233,16 @@ router.get(
  *     parameters:
  *       - in: query
  *         name: dataInicio
+ *         description: Data de início do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de início do período
  *       - in: query
  *         name: dataFim
+ *         description: Data de fim do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de fim do período
  *     responses:
  *       200:
  *         description: Economia por tipo de apontamento
@@ -277,16 +277,16 @@ router.get(
  *     parameters:
  *       - in: query
  *         name: dataInicio
+ *         description: Data de início do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de início do período
  *       - in: query
  *         name: dataFim
+ *         description: Data de fim do período
  *         schema:
  *           type: string
  *           format: date
- *         description: Data de fim do período
  *     responses:
  *       200:
  *         description: Resumo geral de economia

@@ -84,31 +84,57 @@ export class ProcedureApprovalService {
         where: { id: guiaId }
       });
 
-      // Registrar log de auditoria para cada validação aprovada
+      // Registrar log de auditoria
+      let logEntries: AuditLogEntry[];
+      
       if (validacoes.length > 0) {
-        const logEntries: AuditLogEntry[] = validacoes.map((val: any) => ({
+        // Se houver validações, criar um log para cada uma
+        logEntries = validacoes.map((val: any) => ({
           guiaId: guiaId.toString(),
           guiaNumero: guia?.numeroGuiaPrestador,
-          procedimentoSequencial: val.sequencialItem,
+          procedimentoSequencial: parseInt(procedimento.sequencialItem) || null,
           codigoProcedimento: procedimento.codigoProcedimento || '',
           descricaoProcedimento: procedimento.descricaoProcedimento,
           numeroCarteira: guia?.numeroCarteira,
           operadoraRegistroAns: null,
           operadoraNome: null,
           tipoApontamento: val.tipoValidacao || 'VALOR_DIVERGENTE',
-          valorOriginal: parseFloat(val.valorOriginal || procedimento.valorUnitario || 0),
-          quantidadeOriginal: parseFloat(val.quantidadeOriginal || procedimento.quantidadeExecutada || 0),
+          valorOriginal: parseFloat(val.valorEncontrado || procedimento.valorUnitario || 0),
+          quantidadeOriginal: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
           valorContratado: parseFloat(val.valorEsperado || 0),
-          quantidadeMaxima: parseFloat(val.quantidadeMaxima || 0),
-          valorAprovado: parseFloat(val.valorEsperado || val.valorOriginal || 0),
-          quantidadeAprovada: parseFloat(val.quantidadeMaxima || val.quantidadeOriginal || 0),
+          quantidadeMaxima: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          valorAprovado: parseFloat(val.valorEsperado || val.valorEncontrado || 0),
+          quantidadeAprovada: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
           decisao: 'APROVADO',
           auditorId,
           auditorObservacoes: observacoes
         }));
-
-        await auditLogService.registrarLogBatch(logEntries);
+      } else {
+        // Se não houver validações, criar um log genérico de aprovação
+        logEntries = [{
+          guiaId: guiaId.toString(),
+          guiaNumero: guia?.numeroGuiaPrestador,
+          procedimentoSequencial: parseInt(procedimento.sequencialItem) || null,
+          codigoProcedimento: procedimento.codigoProcedimento || '',
+          descricaoProcedimento: procedimento.descricaoProcedimento,
+          numeroCarteira: guia?.numeroCarteira,
+          operadoraRegistroAns: null,
+          operadoraNome: null,
+          tipoApontamento: 'APROVACAO_SEM_PENDENCIA',
+          valorOriginal: parseFloat(procedimento.valorUnitario?.toString() || '0'),
+          quantidadeOriginal: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          valorContratado: parseFloat(procedimento.valorUnitario?.toString() || '0'),
+          quantidadeMaxima: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          valorAprovado: parseFloat(procedimento.valorUnitario?.toString() || '0'),
+          quantidadeAprovada: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          economiaValor: 0, // Sem economia se não houver pendência
+          decisao: 'APROVADO',
+          auditorId,
+          auditorObservacoes: observacoes
+        }];
       }
+
+      await auditLogService.registrarLogBatch(logEntries);
 
       return {
         success: true,
@@ -188,32 +214,58 @@ export class ProcedureApprovalService {
         where: { id: guiaId }
       });
 
-      // Registrar log de auditoria para cada validação rejeitada
+      // Registrar log de auditoria
+      let logEntries: AuditLogEntry[];
+      
       if (validacoes.length > 0) {
-        const logEntries: AuditLogEntry[] = validacoes.map((val: any) => ({
+        // Se houver validações, criar um log para cada uma
+        logEntries = validacoes.map((val: any) => ({
           guiaId: guiaId.toString(),
           guiaNumero: guia?.numeroGuiaPrestador,
-          procedimentoSequencial: val.sequencialItem,
+          procedimentoSequencial: parseInt(procedimento.sequencialItem) || null,
           codigoProcedimento: procedimento.codigoProcedimento || '',
           descricaoProcedimento: procedimento.descricaoProcedimento,
           numeroCarteira: guia?.numeroCarteira,
           operadoraRegistroAns: null,
           operadoraNome: null,
           tipoApontamento: val.tipoValidacao || 'VALOR_DIVERGENTE',
-          valorOriginal: parseFloat(val.valorOriginal || procedimento.valorUnitario || 0),
-          quantidadeOriginal: parseFloat(val.quantidadeOriginal || procedimento.quantidadeExecutada || 0),
+          valorOriginal: parseFloat(val.valorEncontrado || procedimento.valorUnitario || 0),
+          quantidadeOriginal: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
           valorContratado: parseFloat(val.valorEsperado || 0),
-          quantidadeMaxima: parseFloat(val.quantidadeMaxima || 0),
-          valorAprovado: parseFloat(val.valorOriginal || 0), // Mantém valor original quando rejeitado
-          quantidadeAprovada: parseFloat(val.quantidadeOriginal || 0),
+          quantidadeMaxima: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          valorAprovado: parseFloat(val.valorEncontrado || 0), // Mantém valor original quando rejeitado
+          quantidadeAprovada: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
           economiaValor: 0, // Sem economia quando rejeitado
           decisao: 'REJEITADO',
           auditorId,
           auditorObservacoes: observacoes
         }));
-
-        await auditLogService.registrarLogBatch(logEntries);
+      } else {
+        // Se não houver validações, criar um log genérico de rejeição
+        logEntries = [{
+          guiaId: guiaId.toString(),
+          guiaNumero: guia?.numeroGuiaPrestador,
+          procedimentoSequencial: parseInt(procedimento.sequencialItem) || null,
+          codigoProcedimento: procedimento.codigoProcedimento || '',
+          descricaoProcedimento: procedimento.descricaoProcedimento,
+          numeroCarteira: guia?.numeroCarteira,
+          operadoraRegistroAns: null,
+          operadoraNome: null,
+          tipoApontamento: 'REJEICAO_SEM_PENDENCIA',
+          valorOriginal: parseFloat(procedimento.valorUnitario?.toString() || '0'),
+          quantidadeOriginal: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          valorContratado: parseFloat(procedimento.valorUnitario?.toString() || '0'),
+          quantidadeMaxima: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          valorAprovado: parseFloat(procedimento.valorUnitario?.toString() || '0'),
+          quantidadeAprovada: parseInt(procedimento.quantidadeExecutada?.toString() || '1'),
+          economiaValor: 0, // Sem economia quando rejeitado
+          decisao: 'REJEITADO',
+          auditorId,
+          auditorObservacoes: observacoes
+        }];
       }
+
+      await auditLogService.registrarLogBatch(logEntries);
 
       return {
         success: true,
