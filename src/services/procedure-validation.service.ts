@@ -296,8 +296,6 @@ export class ProcedureValidationService {
             valorEsperado: validacao.detalhes?.valorContratado,
             valorEncontrado: validacao.detalhes?.valorCobrado,
             diferenca: validacao.detalhes?.diferenca,
-            porteEsperado: validacao.detalhes?.porteEsperado,
-            porteEncontrado: validacao.detalhes?.porteEncontrado,
             metadata: validacao.detalhes
           },
           update: {
@@ -306,8 +304,6 @@ export class ProcedureValidationService {
             valorEsperado: validacao.detalhes?.valorContratado,
             valorEncontrado: validacao.detalhes?.valorCobrado,
             diferenca: validacao.detalhes?.diferenca,
-            porteEsperado: validacao.detalhes?.porteEsperado,
-            porteEncontrado: validacao.detalhes?.porteEncontrado,
             metadata: validacao.detalhes,
             updatedAt: new Date()
           }

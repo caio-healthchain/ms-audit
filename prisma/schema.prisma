@@ -621,8 +621,6 @@ model auditoria_validacoes {
   valorEsperado    Decimal?              @db.Decimal(10, 2)
   valorEncontrado  Decimal?              @db.Decimal(10, 2)
   diferenca        Decimal?              @db.Decimal(10, 2)
-  porteEsperado    String?
-  porteEncontrado  String?
   metadata         Json?
   auditorId        String?
   dataValidacao    DateTime?
