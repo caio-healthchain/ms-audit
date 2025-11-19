@@ -275,6 +275,9 @@ export class ProcedureValidationService {
     try {
       const validacoesArray = Object.values(validacoes) as ValidationResult[];
 
+      // Verificar se todas as validações estão conformes
+      const todasConformes = validacoesArray.every(v => v.isValid);
+
       for (const validacao of validacoesArray) {
         await prisma.auditoria_validacoes.upsert({
           where: {
@@ -309,6 +312,33 @@ export class ProcedureValidationService {
             updatedAt: new Date()
           }
         });
+      }
+
+      // Auto-aprovar procedimento se não houver pendências
+      if (todasConformes) {
+        await prisma.procedimento_status.upsert({
+          where: {
+            guiaId_procedimentoId: {
+              guiaId,
+              procedimentoId
+            }
+          },
+          create: {
+            guiaId,
+            procedimentoId,
+            status: 'APROVADO',
+            auditorId: 'SISTEMA',
+            observacoes: 'Auto-aprovado: sem pendências identificadas'
+          },
+          update: {
+            status: 'APROVADO',
+            auditorId: 'SISTEMA',
+            observacoes: 'Auto-aprovado: sem pendências identificadas',
+            updatedAt: new Date()
+          }
+        });
+
+        console.log(`Procedimento ${procedimentoId} auto-aprovado (sem pendências)`);
       }
     } catch (error) {
       console.error('Erro ao salvar validações:', error);

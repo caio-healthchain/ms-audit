@@ -12,6 +12,12 @@ const controller = new AuditLogController();
  *   description: Operações relacionadas ao log de auditoria e economia gerada
  */
 
+// Rota para buscar logs de uma guia específica
+router.get(
+  '/guia/:guiaId',
+  asyncHandler(controller.getLogsByGuia.bind(controller))
+);
+
 // Rotas de consulta de economia
 router.get(
   '/economia/periodo',

@@ -133,6 +133,66 @@ export class AuditLogService {
   }
 
   /**
+   * Busca logs de auditoria de uma guia específica
+   */
+  async getLogsByGuia(guiaId: string): Promise<any[]> {
+    try {
+      const result: any = await prisma.$queryRawUnsafe(`
+        SELECT 
+          id,
+          created_at,
+          guia_id,
+          guia_numero,
+          procedimento_sequencial,
+          codigo_procedimento,
+          descricao_procedimento,
+          tipo_apontamento,
+          valor_original,
+          valor_contratado,
+          valor_aprovado,
+          economia_valor,
+          quantidade_original,
+          quantidade_maxima,
+          quantidade_aprovada,
+          decisao,
+          auditor_id,
+          auditor_nome,
+          auditor_observacoes,
+          data_decisao
+        FROM procedimento_auditoria_log
+        WHERE guia_id = '${guiaId}'
+        ORDER BY data_decisao DESC
+      `);
+
+      return result.map((r: any) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        guiaId: r.guia_id,
+        guiaNumero: r.guia_numero,
+        procedimentoSequencial: r.procedimento_sequencial,
+        codigoProcedimento: r.codigo_procedimento,
+        descricaoProcedimento: r.descricao_procedimento,
+        tipoApontamento: r.tipo_apontamento,
+        valorOriginal: parseFloat(r.valor_original || 0),
+        valorContratado: parseFloat(r.valor_contratado || 0),
+        valorAprovado: parseFloat(r.valor_aprovado || 0),
+        economiaValor: parseFloat(r.economia_valor || 0),
+        quantidadeOriginal: parseFloat(r.quantidade_original || 0),
+        quantidadeMaxima: parseFloat(r.quantidade_maxima || 0),
+        quantidadeAprovada: parseFloat(r.quantidade_aprovada || 0),
+        decisao: r.decisao,
+        auditorId: r.auditor_id,
+        auditorNome: r.auditor_nome,
+        auditorObservacoes: r.auditor_observacoes,
+        dataDecisao: r.data_decisao
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar logs da guia:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Consulta economia por período
    */
   async getEconomiaPorPeriodo(

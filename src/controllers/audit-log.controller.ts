@@ -9,6 +9,26 @@ export class AuditLogController {
   }
 
   /**
+   * GET /api/v1/audit-log/guia/:guiaId
+   * Busca logs de auditoria de uma guia específica
+   */
+  async getLogsByGuia(req: Request, res: Response): Promise<void> {
+    try {
+      const { guiaId } = req.params;
+
+      const result = await this.auditLogService.getLogsByGuia(guiaId);
+
+      res.json(result);
+    } catch (error) {
+      console.error('Erro ao buscar logs da guia:', error);
+      res.status(500).json({
+        error: 'Erro ao buscar logs da guia',
+        message: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
+    }
+  }
+
+  /**
    * GET /api/v1/audit-log/economia/periodo
    * Consulta economia por período
    */
