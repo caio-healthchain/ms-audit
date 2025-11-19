@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { AuditLogService, AuditLogEntry } from './audit-log.service';
 
 const prisma = new PrismaClient();
+const auditLogService = new AuditLogService();
 
 export interface ApprovalRequest {
   guiaId: number;
@@ -69,6 +71,45 @@ export class ProcedureApprovalService {
         }
       });
 
+      // Buscar validações para registrar no log
+      const validacoes = await prisma.auditoria_validacoes.findMany({
+        where: {
+          guiaId,
+          procedimentoId
+        }
+      });
+
+      // Buscar dados da guia
+      const guia = await prisma.guia.findUnique({
+        where: { id: guiaId }
+      });
+
+      // Registrar log de auditoria para cada validação aprovada
+      if (validacoes.length > 0) {
+        const logEntries: AuditLogEntry[] = validacoes.map((val: any) => ({
+          guiaId: guiaId.toString(),
+          guiaNumero: guia?.numeroGuiaPrestador,
+          procedimentoSequencial: val.sequencialItem,
+          codigoProcedimento: procedimento.codigoProcedimento || '',
+          descricaoProcedimento: procedimento.descricaoProcedimento,
+          numeroCarteira: guia?.numeroCarteira,
+          operadoraRegistroAns: null,
+          operadoraNome: null,
+          tipoApontamento: val.tipoValidacao || 'VALOR_DIVERGENTE',
+          valorOriginal: parseFloat(val.valorOriginal || procedimento.valorUnitario || 0),
+          quantidadeOriginal: parseFloat(val.quantidadeOriginal || procedimento.quantidadeExecutada || 0),
+          valorContratado: parseFloat(val.valorEsperado || 0),
+          quantidadeMaxima: parseFloat(val.quantidadeMaxima || 0),
+          valorAprovado: parseFloat(val.valorEsperado || val.valorOriginal || 0),
+          quantidadeAprovada: parseFloat(val.quantidadeMaxima || val.quantidadeOriginal || 0),
+          decisao: 'APROVADO',
+          auditorId,
+          auditorObservacoes: observacoes
+        }));
+
+        await auditLogService.registrarLogBatch(logEntries);
+      }
+
       return {
         success: true,
         procedimentoId,
@@ -133,6 +174,46 @@ export class ProcedureApprovalService {
           observacoes
         }
       });
+
+      // Buscar validações para registrar no log
+      const validacoes = await prisma.auditoria_validacoes.findMany({
+        where: {
+          guiaId,
+          procedimentoId
+        }
+      });
+
+      // Buscar dados da guia
+      const guia = await prisma.guia.findUnique({
+        where: { id: guiaId }
+      });
+
+      // Registrar log de auditoria para cada validação rejeitada
+      if (validacoes.length > 0) {
+        const logEntries: AuditLogEntry[] = validacoes.map((val: any) => ({
+          guiaId: guiaId.toString(),
+          guiaNumero: guia?.numeroGuiaPrestador,
+          procedimentoSequencial: val.sequencialItem,
+          codigoProcedimento: procedimento.codigoProcedimento || '',
+          descricaoProcedimento: procedimento.descricaoProcedimento,
+          numeroCarteira: guia?.numeroCarteira,
+          operadoraRegistroAns: null,
+          operadoraNome: null,
+          tipoApontamento: val.tipoValidacao || 'VALOR_DIVERGENTE',
+          valorOriginal: parseFloat(val.valorOriginal || procedimento.valorUnitario || 0),
+          quantidadeOriginal: parseFloat(val.quantidadeOriginal || procedimento.quantidadeExecutada || 0),
+          valorContratado: parseFloat(val.valorEsperado || 0),
+          quantidadeMaxima: parseFloat(val.quantidadeMaxima || 0),
+          valorAprovado: parseFloat(val.valorOriginal || 0), // Mantém valor original quando rejeitado
+          quantidadeAprovada: parseFloat(val.quantidadeOriginal || 0),
+          economiaValor: 0, // Sem economia quando rejeitado
+          decisao: 'REJEITADO',
+          auditorId,
+          auditorObservacoes: observacoes
+        }));
+
+        await auditLogService.registrarLogBatch(logEntries);
+      }
 
       return {
         success: true,
