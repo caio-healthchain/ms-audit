@@ -7,6 +7,61 @@ const controller = new AuditLogController();
 
 /**
  * @swagger
+ * /api/v1/audit-log:
+ *   post:
+ *     tags: [AuditLog]
+ *     summary: Registrar log de auditoria
+ *     description: Cria uma nova entrada no log de auditoria após aprovação/rejeição
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - guiaId
+ *               - codigoProcedimento
+ *               - tipoApontamento
+ *               - valorOriginal
+ *               - valorAprovado
+ *               - decisao
+ *             properties:
+ *               guiaId:
+ *                 type: string
+ *               guiaNumero:
+ *                 type: string
+ *               procedimentoSequencial:
+ *                 type: integer
+ *               codigoProcedimento:
+ *                 type: string
+ *               descricaoProcedimento:
+ *                 type: string
+ *               tipoApontamento:
+ *                 type: string
+ *               valorOriginal:
+ *                 type: number
+ *               valorAprovado:
+ *                 type: number
+ *               economiaValor:
+ *                 type: number
+ *               decisao:
+ *                 type: string
+ *                 enum: [APROVADO, REJEITADO, PARCIALMENTE_APROVADO]
+ *               auditorObservacoes:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Log registrado com sucesso
+ *       500:
+ *         description: Erro ao registrar log
+ */
+router.post(
+  '/',
+  asyncHandler(controller.registrarLog.bind(controller))
+);
+
+/**
+ * @swagger
  * tags:
  *   name: AuditLog
  *   description: Operações relacionadas ao log de auditoria e economia gerada

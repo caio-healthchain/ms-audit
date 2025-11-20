@@ -158,4 +158,28 @@ export class AuditLogController {
       });
     }
   }
+
+  /**
+   * POST /api/v1/audit-log
+   * Registra uma nova entrada no log de auditoria
+   */
+  async registrarLog(req: Request, res: Response): Promise<void> {
+    try {
+      const logEntry = req.body;
+
+      const result = await this.auditLogService.registrarLog(logEntry);
+
+      res.status(201).json({
+        success: true,
+        message: 'Log de auditoria registrado com sucesso',
+        data: result
+      });
+    } catch (error) {
+      console.error('Erro ao registrar log de auditoria:', error);
+      res.status(500).json({
+        error: 'Erro ao registrar log de auditoria',
+        message: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
+    }
+  }
 }
