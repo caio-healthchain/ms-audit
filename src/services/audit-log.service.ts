@@ -134,9 +134,11 @@ export class AuditLogService {
 
   /**
    * Busca logs de auditoria de uma guia específica
+   * @param guiaIdOrNumero - ID da guia ou número da guia (numeroGuiaPrestador)
    */
-  async getLogsByGuia(guiaId: string): Promise<any[]> {
+  async getLogsByGuia(guiaIdOrNumero: string): Promise<any[]> {
     try {
+      // Buscar por guia_id OU guia_numero
       const result: any = await prisma.$queryRawUnsafe(`
         SELECT 
           id,
@@ -160,7 +162,7 @@ export class AuditLogService {
           auditor_observacoes,
           data_decisao
         FROM procedimento_auditoria_log
-        WHERE guia_id = '${guiaId}'
+        WHERE guia_id = '${guiaIdOrNumero}' OR guia_numero = '${guiaIdOrNumero}'
         ORDER BY data_decisao DESC
       `);
 

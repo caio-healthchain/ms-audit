@@ -181,14 +181,14 @@ export class XMLExportService {
    * Constrói XML de um procedimento individual
    */
   private construirProcedimentoXML(procedimento: any, sequencial: number, aplicarCorrecoes: boolean): string {
-    // Determinar valores a usar (corrigidos ou originais)
-    const valorUnitario = aplicarCorrecoes && procedimento.valorCorrigido 
-      ? procedimento.valorCorrigido 
+    // Determinar valores a usar (aprovados ou originais)
+    const valorUnitario = aplicarCorrecoes && procedimento.valorAprovado !== null && procedimento.valorAprovado !== undefined
+      ? procedimento.valorAprovado 
       : procedimento.valorUnitario || 0;
     
-    const quantidade = aplicarCorrecoes && procedimento.quantidadeCorrigida
-      ? procedimento.quantidadeCorrigida
-      : procedimento.quantidade || 1;
+    const quantidade = aplicarCorrecoes && procedimento.quantidadeAprovada
+      ? procedimento.quantidadeAprovada
+      : procedimento.quantidadeExecutada || 1;
 
     const valorTotal = valorUnitario * quantidade;
 
@@ -226,13 +226,13 @@ export class XMLExportService {
     };
 
     procedimentos.forEach((proc: any) => {
-      const valorUnitario = aplicarCorrecoes && proc.valorCorrigido 
-        ? proc.valorCorrigido 
+      const valorUnitario = aplicarCorrecoes && proc.valorAprovado !== null && proc.valorAprovado !== undefined
+        ? proc.valorAprovado 
         : proc.valorUnitario || 0;
       
-      const quantidade = aplicarCorrecoes && proc.quantidadeCorrigida
-        ? proc.quantidadeCorrigida
-        : proc.quantidade || 1;
+      const quantidade = aplicarCorrecoes && proc.quantidadeAprovada
+        ? proc.quantidadeAprovada
+        : proc.quantidadeExecutada || 1;
 
       const valorTotal = valorUnitario * quantidade;
 
