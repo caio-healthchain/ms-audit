@@ -152,7 +152,7 @@ export class ProcedureApprovalService {
           valorAprovado = valorContratado;
           
           const valorOriginal = parseFloat(procedimento.valorTotal?.toString() || '0');
-          economiaValor = valorAprovado - valorOriginal;
+          economiaValor = valorOriginal - valorAprovado;
         } else {
           // Se não houver validação de valor, usar o valor original
           valorAprovado = parseFloat(procedimento.valorTotal?.toString() || '0');
@@ -168,7 +168,7 @@ export class ProcedureApprovalService {
           // Usar valor contratual como aprovado
           valorAprovado = valorContratado;
           const valorOriginal = parseFloat(procedimento.valorTotal?.toString() || '0');
-          economiaValor = valorAprovado - valorOriginal;
+          economiaValor = valorOriginal - valorAprovado;
         } else {
           // Se não encontrar valor contratual, usar valor original
           valorAprovado = parseFloat(procedimento.valorTotal?.toString() || '0');
