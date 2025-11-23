@@ -24,6 +24,7 @@ export interface AuditLogEntry {
   auditorNome?: string;
   auditorObservacoes?: string;
   xmlEntradaHash?: string;
+  fonteValor?: string;
 }
 
 export interface EconomiaResumo {
@@ -71,6 +72,7 @@ export class AuditLogService {
           auditor_nome,
           auditor_observacoes,
           xml_entrada_hash,
+          fonte_valor,
           data_decisao
         ) VALUES (
           ${entry.guiaId},
@@ -94,6 +96,7 @@ export class AuditLogService {
           ${entry.auditorNome || null},
           ${entry.auditorObservacoes || null},
           ${entry.xmlEntradaHash || null},
+          ${entry.fonteValor || null},
           NOW()
         )
       `;

@@ -25,10 +25,10 @@ export class ProcedureApprovalService {
    */
   private async getValorContratual(
     codigoTUSS: string
-  ): Promise<number | null> {
+  ): Promise<{valor: number, fonte: string} | null> {
     try {
-      // Buscar em qualquer contrato ativo, priorizando o mais recente
-      const contratoItem = await prisma.$queryRaw`
+      // 1. Buscar em qualquer contrato ativo, priorizando o mais recente
+      const contratoItem = await prisma.$queryRaw<any[]>`
         SELECT ci."valorContratado"
         FROM contrato_itens ci
         JOIN contrato c ON c.id::text = ci."contratoId"
@@ -39,12 +39,32 @@ export class ProcedureApprovalService {
         LIMIT 1
       `;
 
-      if (!contratoItem || (contratoItem as any[]).length === 0) {
-        console.log(`Valor contratual não encontrado para TUSS ${codigoTUSS}`);
-        return null;
+      if (contratoItem && contratoItem.length > 0 && contratoItem[0].valorContratado) {
+        return {
+          valor: parseFloat(contratoItem[0].valorContratado.toString()),
+          fonte: 'CONTRATO'
+        };
       }
 
-      return parseFloat((contratoItem as any[])[0].valorContratado.toString());
+      // 2. Não encontrou no contrato - buscar na CBHPM
+      const cbhpm = await prisma.$queryRaw<any[]>`
+        SELECT valor_referencia 
+        FROM cbhpm_procedimentos 
+        WHERE codigo = ${codigoTUSS}
+        AND (vigencia_fim IS NULL OR vigencia_fim >= CURRENT_DATE)
+        LIMIT 1
+      `;
+
+      if (cbhpm && cbhpm.length > 0 && cbhpm[0].valor_referencia) {
+        return {
+          valor: parseFloat(cbhpm[0].valor_referencia.toString()),
+          fonte: 'CBHPM'
+        };
+      }
+
+      // 3. Não encontrou nem no contrato nem na CBHPM
+      console.log(`Valor não encontrado para TUSS ${codigoTUSS} (nem contrato nem CBHPM)`);
+      return null;
     } catch (error) {
       console.error('Erro ao buscar valor contratual:', error);
       return null;
@@ -142,37 +162,43 @@ export class ProcedureApprovalService {
       // Determinar valor aprovado
       let valorAprovado: number;
       let valorContratado: number | null = null;
+      let fonteValor: string = 'GUIA';
       let economiaValor = 0;
 
-      if (validacoes.length > 0) {
-        // Se houver validações, usar o valorEsperado (valor contratual)
-        const validacaoValor = validacoes.find(v => v.tipoValidacao === 'VALOR');
-        if (validacaoValor && validacaoValor.valorEsperado) {
-          valorContratado = parseFloat(validacaoValor.valorEsperado.toString());
-          valorAprovado = valorContratado;
+      // Verificar se já existe validação com valor
+      const validacaoValor = validacoes.find(v => 
+        (v.tipoValidacao === 'VALOR' || v.tipoValidacao === 'PACOTE') &&
+        v.valorEsperado !== null
+      );
+
+      if (validacaoValor && validacaoValor.valorEsperado) {
+        // Usar valor da validação existente
+        valorAprovado = parseFloat(validacaoValor.valorEsperado.toString());
+        valorContratado = valorAprovado;
+        fonteValor = validacaoValor.fonteValor || 'VALIDACAO';
+        
+        const valorOriginal = parseFloat(procedimento.valorTotal?.toString() || '0');
+        economiaValor = valorOriginal - valorAprovado;
+      } else {
+        // Buscar valor contratual/CBHPM
+        const resultado = await this.getValorContratual(
+          procedimento.codigoProcedimento || ''
+        );
+
+        if (resultado) {
+          // Tem valor contratual/CBHPM - usar esse
+          valorAprovado = resultado.valor;
+          valorContratado = resultado.valor;
+          fonteValor = resultado.fonte;
           
           const valorOriginal = parseFloat(procedimento.valorTotal?.toString() || '0');
           economiaValor = valorOriginal - valorAprovado;
         } else {
-          // Se não houver validação de valor, usar o valor original
+          // Não tem valor contratual - usar valor da guia
           valorAprovado = parseFloat(procedimento.valorTotal?.toString() || '0');
-          valorContratado = valorAprovado;
-        }
-      } else {
-        // Se não houver validações, tentar buscar valor contratual
-        valorContratado = await this.getValorContratual(
-          procedimento.codigoProcedimento || ''
-        );
-
-        if (valorContratado) {
-          // Usar valor contratual como aprovado
-          valorAprovado = valorContratado;
-          const valorOriginal = parseFloat(procedimento.valorTotal?.toString() || '0');
-          economiaValor = valorOriginal - valorAprovado;
-        } else {
-          // Se não encontrar valor contratual, usar valor original
-          valorAprovado = parseFloat(procedimento.valorTotal?.toString() || '0');
-          valorContratado = valorAprovado;
+          valorContratado = null;
+          fonteValor = 'GUIA';
+          economiaValor = 0;
         }
       }
 
@@ -248,7 +274,8 @@ export class ProcedureApprovalService {
           economiaValor: parseFloat(val.diferenca?.toString() || economiaValor.toString() || '0'),
           decisao: 'APROVADO',
           auditorId,
-          auditorObservacoes: observacoes
+          auditorObservacoes: observacoes,
+          fonteValor: val.fonteValor || fonteValor
         }));
       } else {
         // Se não houver validações, criar um log genérico de aprovação
@@ -275,7 +302,8 @@ export class ProcedureApprovalService {
           economiaValor: economiaValor,
           decisao: 'APROVADO',
           auditorId,
-          auditorObservacoes: observacoes
+          auditorObservacoes: observacoes,
+          fonteValor: fonteValor
         }];
       }
 

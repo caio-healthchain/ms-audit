@@ -629,6 +629,7 @@ model auditoria_validacoes {
   auditorId        String?
   dataValidacao    DateTime?
   observacoes      String?
+  fonteValor       String?              @db.VarChar(20)
 
   @@unique([guiaId, procedimentoId, tipoValidacao], name: "guiaId_procedimentoId_tipoValidacao")
   @@index([guiaId])
@@ -678,4 +679,59 @@ enum StatusProcedimento {
   APROVADO
   REJEITADO
   EM_ANALISE
+}
+
+// Tabela de Log de Auditoria de Procedimentos
+model procedimento_auditoria_log {
+  id                        Int       @id @default(autoincrement())
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @default(now()) @updatedAt
+  guia_id                   String    @db.VarChar(255)
+  guia_numero               String?   @db.VarChar(255)
+  procedimento_sequencial   Int?
+  codigo_procedimento       String?   @db.VarChar(255)
+  descricao_procedimento    String?
+  numero_carteira           String?   @db.VarChar(255)
+  operadora_registro_ans    String?   @db.VarChar(255)
+  operadora_nome            String?   @db.VarChar(255)
+  tipo_apontamento          String?   @db.VarChar(255)
+  valor_original            Decimal?  @db.Decimal(10, 2)
+  quantidade_original       Decimal?  @db.Decimal(10, 4)
+  valor_contratado          Decimal?  @db.Decimal(10, 2)
+  quantidade_maxima         Decimal?  @db.Decimal(10, 4)
+  valor_aprovado            Decimal?  @db.Decimal(10, 2)
+  quantidade_aprovada       Decimal?  @db.Decimal(10, 4)
+  economia_valor            Decimal?  @db.Decimal(10, 2)
+  decisao                   String?   @db.VarChar(50)
+  auditor_id                String?   @db.VarChar(255)
+  auditor_nome              String?   @db.VarChar(255)
+  auditor_observacoes       String?
+  data_decisao              DateTime?
+  xml_entrada_hash          String?   @db.VarChar(255)
+  fonte_valor               String?   @db.VarChar(20)
+
+  @@index([guia_id])
+  @@index([codigo_procedimento])
+  @@index([decisao])
+  @@map("procedimento_auditoria_log")
+}
+
+// Tabela de referência CBHPM
+model cbhpm_procedimentos {
+  codigo            String    @id @db.VarChar(10)
+  descricao         String
+  porte             String?   @db.VarChar(10)
+  valor_referencia  Decimal?  @db.Decimal(10, 2)
+  uco               Decimal?  @db.Decimal(10, 2)
+  filme             Int?
+  auxiliares        Int?
+  porte_anestesico  String?   @db.VarChar(10)
+  vigencia_inicio   DateTime? @db.Date
+  vigencia_fim      DateTime? @db.Date
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  @@index([codigo])
+  @@index([vigencia_inicio, vigencia_fim])
+  @@map("cbhpm_procedimentos")
 }
