@@ -29,14 +29,11 @@ export class ProcedureValidationService {
   async validatePorte(codigoTUSS: string, porteEncontrado?: string): Promise<ValidationResult> {
     try {
       // Buscar porte esperado na tabela tbdomPorte
-      const porteEsperado = await prisma.$queryRaw<any[]>`
-        SELECT porte, procedimento
-        FROM "tbdomPorte"
-        WHERE codigo = ${codigoTUSS}
-        LIMIT 1
-      `;
+      const porteEsperado = await prisma.tbdomPorte.findUnique({
+        where: { codigo: codigoTUSS }
+      });
 
-      if (!porteEsperado || porteEsperado.length === 0) {
+      if (!porteEsperado) {
         return {
           isValid: true,
           tipo: 'PORTE',
@@ -49,8 +46,7 @@ export class ProcedureValidationService {
         };
       }
 
-      const porte = porteEsperado[0];
-      const isValid = !porteEncontrado || porte.porte === porteEncontrado;
+      const isValid = !porteEncontrado || porteEsperado.porte === porteEncontrado;
 
       return {
         isValid,
@@ -58,12 +54,11 @@ export class ProcedureValidationService {
         status: isValid ? 'CONFORME' : 'DIVERGENTE',
         mensagem: isValid
           ? 'Porte cirúrgico conforme'
-          : `Porte divergente: Esperado ${porte.porte}, Encontrado ${porteEncontrado || 'Não informado'}`,
+          : `Porte divergente: Esperado ${porteEsperado.porte}, Encontrado ${porteEncontrado}`,
         detalhes: {
           codigoTUSS,
-          porteEsperado: porte.porte,
-          porteEncontrado: porteEncontrado || 'Não informado',
-          procedimento: porte.procedimento
+          porteEsperado: porteEsperado.porte,
+          porteEncontrado: porteEncontrado || 'Não informado'
         }
       };
     } catch (error) {
@@ -76,67 +71,48 @@ export class ProcedureValidationService {
    * Valida o valor cobrado de um procedimento
    */
   async validateValor(
-    operadoraId: string | null,
+    operadoraId: string,
     codigoTUSS: string,
     valorCobrado: number
   ): Promise<ValidationResult> {
     try {
-      let valorContratado: number | null = null;
-      let fonte: string = '';
-      let contratoNumero: string | null = null;
-
-      // 1. Tentar buscar no contrato (se operadoraId fornecido)
-      if (operadoraId) {
-        const contrato = await prisma.$queryRaw<any[]>`
-          SELECT c.numero, ci."valorContratado"
-          FROM contrato c
-          INNER JOIN contrato_itens ci ON ci."contratoId" = c.id
-          WHERE c."operadoraId" = ${operadoraId}
-            AND c.status = 'ATIVO'
-            AND c."dataFim" >= NOW()
-            AND ci."codigoTUSS" = ${codigoTUSS}
-          LIMIT 1
-        `;
-
-        if (contrato && contrato.length > 0) {
-          valorContratado = parseFloat(contrato[0].valorContratado);
-          contratoNumero = contrato[0].numero;
-          fonte = 'CONTRATO';
-        }
-      }
-
-      // 2. Se não encontrou no contrato, buscar na CBHPM
-      if (valorContratado === null) {
-        const cbhpm = await prisma.$queryRaw<any[]>`
-          SELECT "valor_referencia"
-          FROM cbhpm_procedimentos
-          WHERE codigo = ${codigoTUSS}
-            AND (vigencia_fim IS NULL OR vigencia_fim >= NOW())
-          LIMIT 1
-        `;
-
-        if (cbhpm && cbhpm.length > 0 && cbhpm[0].valor_referencia) {
-          valorContratado = parseFloat(cbhpm[0].valor_referencia);
-          fonte = 'CBHPM';
-        }
-      }
-
-      // 3. Se não encontrou nem no contrato nem na CBHPM
-      if (valorContratado === null) {
-        return {
-          isValid: true, // Sem referência, não há divergência
-          tipo: 'VALOR',
-          status: 'SEM_REFERENCIA',
-          mensagem: `Sem valor de referência para o código ${codigoTUSS}`,
-          detalhes: {
-            codigoTUSS,
-            valorCobrado: parseFloat(valorCobrado.toString()),
-            fonte: 'GUIA'
+      // Buscar contrato ativo da operadora
+      const contrato = await prisma.contrato.findFirst({
+        where: {
+          operadoraId,
+          status: 'ATIVO',
+          dataFim: { gte: new Date() }
+        },
+        include: {
+          itens: {
+            where: { codigoTUSS }
           }
+        }
+      });
+
+      if (!contrato) {
+        return {
+          isValid: false,
+          tipo: 'VALOR',
+          status: 'ERRO',
+          mensagem: 'Contrato não encontrado ou inativo',
+          detalhes: null
         };
       }
 
-      // 4. Comparar valores
+      const item = contrato.itens[0];
+
+      if (!item) {
+        return {
+          isValid: false,
+          tipo: 'VALOR',
+          status: 'NAO_ENCONTRADO',
+          mensagem: `Procedimento ${codigoTUSS} não encontrado no contrato`,
+          detalhes: null
+        };
+      }
+
+      const valorContratado = parseFloat(item.valorContratado.toString());
       const valorCobradoNum = parseFloat(valorCobrado.toString());
       const diferenca = valorCobradoNum - valorContratado;
       const percentualDiferenca = ((diferenca / valorContratado) * 100).toFixed(2);
@@ -148,16 +124,15 @@ export class ProcedureValidationService {
         tipo: 'VALOR',
         status: isValid ? 'CONFORME' : 'DIVERGENTE',
         mensagem: isValid
-          ? `Valor conforme ${fonte.toLowerCase()}`
-          : `Valor divergente: ${diferenca > 0 ? '+' : ''}R$ ${Math.abs(diferenca).toFixed(2)} (${percentualDiferenca}%)`,
+          ? 'Valor conforme contrato'
+          : `Valor divergente: ${diferenca > 0 ? '+' : ''}R$ ${diferenca.toFixed(2)} (${percentualDiferenca}%)`,
         detalhes: {
           codigoTUSS,
           valorContratado,
           valorCobrado: valorCobradoNum,
           diferenca,
           percentualDiferenca: parseFloat(percentualDiferenca),
-          fonte,
-          contratoNumero
+          contratoNumero: contrato.numero
         }
       };
     } catch (error) {
@@ -169,29 +144,22 @@ export class ProcedureValidationService {
   /**
    * Valida se o procedimento está no pacote contratual
    */
-  async validatePacote(operadoraId: string | null, codigoTUSS: string): Promise<ValidationResult> {
+  async validatePacote(operadoraId: string, codigoTUSS: string): Promise<ValidationResult> {
     try {
-      if (!operadoraId) {
-        return {
-          isValid: true,
-          tipo: 'PACOTE',
-          status: 'SEM_CONTRATO',
-          mensagem: 'Operadora não informada',
-          detalhes: null
-        };
-      }
+      const contrato = await prisma.contrato.findFirst({
+        where: {
+          operadoraId,
+          status: 'ATIVO',
+          dataFim: { gte: new Date() }
+        },
+        include: {
+          itens: {
+            where: { codigoTUSS }
+          }
+        }
+      });
 
-      const contrato = await prisma.$queryRaw<any[]>`
-        SELECT c.numero, ci."estaNoPacote", ci."requerAutorizacao"
-        FROM contrato c
-        LEFT JOIN contrato_itens ci ON ci."contratoId" = c.id AND ci."codigoTUSS" = ${codigoTUSS}
-        WHERE c."operadoraId" = ${operadoraId}
-          AND c.status = 'ATIVO'
-          AND c."dataFim" >= NOW()
-        LIMIT 1
-      `;
-
-      if (!contrato || contrato.length === 0) {
+      if (!contrato) {
         return {
           isValid: false,
           tipo: 'PACOTE',
@@ -201,10 +169,9 @@ export class ProcedureValidationService {
         };
       }
 
-      const item = contrato[0];
+      const item = contrato.itens[0];
 
-      if (!item.estaNoPacote && item.estaNoPacote !== false) {
-        // Procedimento não está no contrato
+      if (!item) {
         return {
           isValid: false,
           tipo: 'PACOTE',
@@ -212,13 +179,13 @@ export class ProcedureValidationService {
           mensagem: `Procedimento ${codigoTUSS} NÃO incluído no pacote contratual - Possível glosa`,
           detalhes: {
             codigoTUSS,
-            contratoNumero: item.numero,
+            contratoNumero: contrato.numero,
             requerAutorizacao: true
           }
         };
       }
 
-      const isValid = item.estaNoPacote === true;
+      const isValid = item.estaNoPacote;
 
       return {
         isValid,
@@ -231,7 +198,8 @@ export class ProcedureValidationService {
           codigoTUSS,
           estaNoPacote: item.estaNoPacote,
           requerAutorizacao: item.requerAutorizacao,
-          contratoNumero: item.numero
+          contratoNumero: contrato.numero,
+          observacoes: item.observacoes
         }
       };
     } catch (error) {
@@ -246,8 +214,7 @@ export class ProcedureValidationService {
   async validateProcedimento(
     guiaId: number,
     procedimentoId: number,
-    operadoraId: string | null,
-    porteEncontrado?: string
+    operadoraId: string
   ): Promise<ProcedureValidationResult> {
     try {
       // Buscar procedimento da guia
@@ -265,7 +232,7 @@ export class ProcedureValidationService {
       // Executar validações em paralelo
       const [valorValidation, porteValidation, pacoteValidation] = await Promise.all([
         this.validateValor(operadoraId, codigoTUSS, valorCobrado),
-        this.validatePorte(codigoTUSS, porteEncontrado),
+        this.validatePorte(codigoTUSS),
         this.validatePacote(operadoraId, codigoTUSS)
       ]);
 
@@ -308,48 +275,67 @@ export class ProcedureValidationService {
     try {
       const validacoesArray = Object.values(validacoes) as ValidationResult[];
 
-      for (const validacao of validacoesArray) {
-        // Mapear tipo para enum do Prisma
-        let tipoValidacao: 'VALOR' | 'PORTE' | 'PACOTE';
-        if (validacao.tipo === 'VALOR') tipoValidacao = 'VALOR';
-        else if (validacao.tipo === 'PORTE') tipoValidacao = 'PORTE';
-        else if (validacao.tipo === 'PACOTE') tipoValidacao = 'PACOTE';
-        else continue;
+      // Verificar se todas as validações estão conformes
+      const todasConformes = validacoesArray.every(v => v.isValid);
 
+      for (const validacao of validacoesArray) {
         await prisma.auditoria_validacoes.upsert({
           where: {
             guiaId_procedimentoId_tipoValidacao: {
               guiaId,
               procedimentoId,
-              tipoValidacao
+              tipoValidacao: validacao.tipo as any
             }
           },
           create: {
             guiaId,
             procedimentoId,
-            tipoValidacao,
+            tipoValidacao: validacao.tipo as any,
             status: validacao.status as any,
             mensagem: validacao.mensagem,
-            valorEsperado: validacao.detalhes?.valorContratado?.toString(),
-            valorEncontrado: validacao.detalhes?.valorCobrado?.toString(),
-            diferenca: validacao.detalhes?.diferenca?.toString(),
-            fonteValor: validacao.detalhes?.fonte || null,
+            valorEsperado: validacao.detalhes?.valorContratado,
+            valorEncontrado: validacao.detalhes?.valorCobrado,
+            diferenca: validacao.detalhes?.diferenca,
             metadata: validacao.detalhes
           },
           update: {
             status: validacao.status as any,
             mensagem: validacao.mensagem,
-            valorEsperado: validacao.detalhes?.valorContratado?.toString(),
-            valorEncontrado: validacao.detalhes?.valorCobrado?.toString(),
-            diferenca: validacao.detalhes?.diferenca?.toString(),
-            fonteValor: validacao.detalhes?.fonte || null,
+            valorEsperado: validacao.detalhes?.valorContratado,
+            valorEncontrado: validacao.detalhes?.valorCobrado,
+            diferenca: validacao.detalhes?.diferenca,
             metadata: validacao.detalhes,
             updatedAt: new Date()
           }
         });
       }
 
-      console.log(`✅ Validações salvas para procedimento ${procedimentoId}`);
+      // Auto-aprovar procedimento se não houver pendências
+      if (todasConformes) {
+        await prisma.procedimento_status.upsert({
+          where: {
+            guiaId_procedimentoId: {
+              guiaId,
+              procedimentoId
+            }
+          },
+          create: {
+            guiaId,
+            procedimentoId,
+            status: 'APROVADO',
+            auditorId: 'SISTEMA',
+            observacoes: 'Auto-aprovado: sem pendências identificadas'
+          },
+          update: {
+            status: 'APROVADO',
+            auditorId: 'SISTEMA',
+            observacoes: 'Auto-aprovado: sem pendências identificadas',
+            updatedAt: new Date()
+          }
+        });
+
+        console.log(`Procedimento ${procedimentoId} auto-aprovado (sem pendências)`);
+      }
     } catch (error) {
       console.error('Erro ao salvar validações:', error);
       // Não lançar erro para não interromper o fluxo
@@ -359,42 +345,33 @@ export class ProcedureValidationService {
   /**
    * Valida todos os procedimentos de uma guia
    */
-  async validateGuia(guiaId: number, operadoraId: string | null): Promise<any> {
+  async validateGuia(guiaId: number, operadoraId: string): Promise<any> {
     try {
       const procedimentos = await prisma.guia_procedimentos.findMany({
         where: { guiaId }
       });
 
-      if (procedimentos.length === 0) {
-        return {
-          success: false,
-          message: 'Nenhum procedimento encontrado na guia'
-        };
-      }
+      const validacoes = await Promise.all(
+        procedimentos.map((proc) =>
+          this.validateProcedimento(guiaId, proc.id, operadoraId)
+        )
+      );
 
-      const results = [];
-      let totalPendencias = 0;
-
-      for (const proc of procedimentos) {
-        const result = await this.validateProcedimento(
-          guiaId,
-          proc.id,
-          operadoraId,
-          undefined // TODO: Extrair porte do XML se disponível
-        );
-
-        results.push(result);
-        totalPendencias += result.totalPendencias;
-      }
+      const totalProcedimentos = validacoes.length;
+      const procedimentosConformes = validacoes.filter((v) => v.isValid).length;
+      const procedimentosPendentes = totalProcedimentos - procedimentosConformes;
+      const pendencias = validacoes.filter((v) => !v.isValid);
 
       return {
-        success: true,
-        data: {
-          guiaId,
-          procedimentosValidados: results.length,
-          totalPendencias,
-          procedimentos: results
-        }
+        guiaId,
+        totalProcedimentos,
+        procedimentosConformes,
+        procedimentosPendentes,
+        percentualConformidade: ((procedimentosConformes / totalProcedimentos) * 100).toFixed(
+          2
+        ),
+        validacoes,
+        pendencias
       };
     } catch (error) {
       console.error('Erro ao validar guia:', error);
@@ -402,5 +379,3 @@ export class ProcedureValidationService {
     }
   }
 }
-
-export default new ProcedureValidationService();
