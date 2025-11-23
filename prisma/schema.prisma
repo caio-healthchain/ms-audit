@@ -296,7 +296,7 @@ model guia {
 }
 
 model guia_procedimentos {
-  id                    Int     @id @default(autoincrement())
+  id                    Int      @id @default(autoincrement())
   sequencialItem        String
   dataExecucao          String?
   horaInicial           String?
@@ -310,10 +310,14 @@ model guia_procedimentos {
   reducaoAcrescimo      Float?
   valorUnitario         Float?
   valorTotal            Float?
+  valorAprovado         Float?
+  quantidadeAprovada    Int?
   nomeProfissional      String?
   identEquipe           Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
   guiaId                Int
-  guia                  guia    @relation(fields: [guiaId], references: [id], onDelete: Cascade)
+  guia                  guia     @relation(fields: [guiaId], references: [id], onDelete: Cascade)
 
   @@unique([guiaId, sequencialItem])
 }
