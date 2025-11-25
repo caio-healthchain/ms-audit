@@ -12,10 +12,13 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "mcp": "ts-node src/mcp/server.ts",
+    "mcp:build": "tsc && node dist/mcp/server.js"
   },
   "dependencies": {
     "@azure/service-bus": "^7.9.5",
+    "@modelcontextprotocol/sdk": "^1.22.0",
     "@prisma/client": "^5.7.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -58,7 +61,7 @@
     "supertest": "^6.3.3",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.0",
-	"tsc-alias": "^1.8.8",
+    "tsc-alias": "^1.8.8",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.0"
   },

@@ -21,6 +21,7 @@ import procedureRoutes from './routes/procedure.routes';
 import auditLogRoutes from './routes/audit-log.routes';
 import xmlExportRoutes from './routes/xml-export.routes';
 import validationRoutes from './routes/validation.routes';
+import analyticsRoutes from './routes/analytics.routes';
 
 class msauditService {
   private app: express.Application;
@@ -89,6 +90,7 @@ class msauditService {
     this.app.use('/api/v1/audit-log', auditLogRoutes);
     this.app.use('/api/v1/xml', xmlExportRoutes);
     this.app.use('/api/v1/validations', validationRoutes);
+    this.app.use('/api/v1/analytics', analyticsRoutes);
 
     // Root endpoint
     this.app.get('/', (req, res) => {
