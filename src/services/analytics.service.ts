@@ -1,4 +1,4 @@
-import { PrismaClient, AuditLogAction } from '@prisma/client';
+import { PrismaClient, AuditLogAction, Prisma } from '@prisma/client';
 import { logger } from '../config/logger';
 
 const prisma = new PrismaClient();
@@ -73,10 +73,10 @@ export class AnalyticsService {
             lte: endDate
           },
           oldValues: {
-            not: null
+            not: Prisma.JsonNull
           },
           newValues: {
-            not: null
+            not: Prisma.JsonNull
           }
         },
         select: {
