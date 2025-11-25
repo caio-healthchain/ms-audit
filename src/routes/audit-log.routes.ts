@@ -147,16 +147,16 @@ router.get(
  *     parameters:
  *       - in: query
  *         name: dataInicio
- *         description: Data de início do período (formato: YYYY-MM-DD)
  *         schema:
  *           type: string
  *           format: date
+ *         description: Data de início do período (formato YYYY-MM-DD)
  *       - in: query
  *         name: dataFim
- *         description: Data de fim do período (formato: YYYY-MM-DD)
  *         schema:
  *           type: string
  *           format: date
+ *         description: Data de fim do período (formato YYYY-MM-DD)
  *       - in: query
  *         name: operadoraId
  *         schema:
